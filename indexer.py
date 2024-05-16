@@ -108,6 +108,8 @@ def indexer(path):
     total_page_count = 0
     # loop through each folder in DEV
     for domain in os.listdir(path):
+        if domain != "www_informatics_uci_edu":
+            continue
         domain_path = os.path.join(path, domain)
         # loop through each json & extract content using encoding
         for page in os.listdir(domain_path):
