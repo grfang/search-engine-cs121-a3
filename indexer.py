@@ -3,6 +3,8 @@ import os
 import json
 from collections import defaultdict
 
+import shelve
+
 def wordFrequencies(text):
     '''
     Finds all the frequencies of words, accounts for ' and -
@@ -44,19 +46,30 @@ def write_file(inverted_index, file_name):
     '''
     Write local inverted_index to json file
     '''
-    try:
-        with open(file_name, "r") as file:
-            old_data = json.load(file)
-    except: 
-        old_data = defaultdict(list)
+    # try:
+    #     with open(file_name, "r") as file:
+    #         old_data = json.load(file)
+    # except: 
+    #     old_data = defaultdict(list)
+    
+    old_data = shelve.open(file_name)
     
     for token, postings in inverted_index.items():
-        for posting in postings:
-            for url, frequency in posting.items():
-                old_data[token].append({url: frequency})
+        old_data[token] = postings
+        old_data.sync()
+        # for posting in postings:
+        #     for url, frequency in posting.items():
+        #         if token in old_data:
+        #             old_data[token].append({url: frequency})
+        #             old_data.sync()
+        #         else:
+        #             old_data[token] = [{url: frequency}]
+        #             old_data.sync()
+    
+    old_data.close()
 
-    with open(file_name, "w") as file:
-        json.dump(old_data, file, indent=4)
+    # with open(file_name, "w") as file:
+    #     json.dump(old_data, file, indent=4)
 
 
 def merge_files(f1, f2): 
@@ -105,8 +118,6 @@ def indexer(path):
                     data = json.load(json_file)
                     url = data["url"]
                     content = data["content"]
-                    # encoding = data["encoding"]
-                    # decoded = content.decode(encoding, errors="ignore")
                     soup = BeautifulSoup(content, 'html.parser')
                     text = soup.get_text()
                     write_inverted_index(url, text, inverted_index)
@@ -119,7 +130,7 @@ def indexer(path):
                 except json.JSONDecodeError as e:
                     print("Error parsing JSON file:", str(e))
 
-    write_file(inverted_index, f"inverted_index_{total_page_count}.json")
+    write_file(inverted_index, f"inverted_index_{total_page_count}.shelve")
     print(f"The number of indexed documents: {total_page_count}")
     print(f"The number of unique words: {len(inverted_index)}")
 
