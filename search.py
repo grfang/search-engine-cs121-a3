@@ -1,7 +1,7 @@
 import shelve
 
 if __name__ == "__main__":
-    data = shelve.open("inverted_index_1454.shelve")
+    data = shelve.open("inverted_index.shelve")
     while True:
         query = input("What do you want to search?: ")
         query = query.split()
@@ -18,7 +18,7 @@ if __name__ == "__main__":
                 j, k = 0, 0
                 while j<len(matches) and k<len(sorted_lists[i]):
                     if list(matches[j].keys())[0] == list(sorted_lists[i][k].keys())[0]:
-                        temp.append(list(matches[j].keys())[0])
+                        temp.append(matches[j])
                         j += 1
                         k += 1
                     elif list(matches[j].keys())[0] < list(sorted_lists[i][k].keys())[0]:
@@ -28,11 +28,11 @@ if __name__ == "__main__":
                 matches = temp
                 temp = list()
             if len(matches) > 5:
-                for url in matches[:5]:
-                    print(url)
+                for posting in matches[:5]:
+                    print(list(posting.keys())[0])
             else:
-                for url in matches:
-                    print(url)
+                for posting in matches:
+                    print(list(posting.keys())[0])
         else:
             if len(sorted_lists[0]) > 5:
                 for posting in sorted_lists[0][:5]:
