@@ -2,10 +2,10 @@ import shelve
 from nltk.stem.snowball import SnowballStemmer
 from collections import defaultdict
 import math
+import time
 
 
-def cosine_sim(query, match_list):
-    query_items = query.lower().split()
+def cosine_sim(query_items, match_list):
     scores = defaultdict(float)
     doc_length = defaultdict(float)
     for term in query_items:
@@ -32,5 +32,15 @@ def cosine_sim(query, match_list):
 
 if __name__ == "__main__":
     stemmer = SnowballStemmer("english")
-    data = shelve.open("inverted_index_test.shelve")
-    data.close()
+    data = shelve.open("inverted_index_total.shelve")
+    query = "copi code"
+    start_time = time.process_time_ns()
+    query_lst = query.split()
+    for i in range(len(query_lst)):
+        query_lst[i] = stemmer.stem(query_lst[i].lower())
+    dict1 = dict()
+    for q in query_lst:
+        dict1[q] = data[q].copy()
+    print(cosine_sim(query_lst, dict1))
+    end_time = time.process_time_ns()
+    print(f"Indexing time: {end_time - start_time}")
