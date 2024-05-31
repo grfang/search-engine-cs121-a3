@@ -1,5 +1,7 @@
 DEV
-developer.zip
+*.zip
 *.shelve
 *.json
 ANALYST
+*.txt
+.env

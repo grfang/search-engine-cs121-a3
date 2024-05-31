@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>search shenanigans</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #A4B080;
+        }
+        #title {
+            font-size: 2rem;
+            color: #6D492F;
+            margin-bottom: 30px;
+        }
+        #search-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+        #search-box {
+            margin-bottom: 20px;
+            border-radius: 25px;
+            height: 30px;
+            width: 250px;
+            border-color: #6D492F;
+            border-width: 2px;
+            padding-left: 10px;
+            background-color: #dacab5;
+        }
+        #results {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+        .result {
+            padding: 20px;
+            border: 2px solid #707B50;
+            margin-bottom: 20px;
+            border-radius: 25px;
+            background-color: #dacab5;
+        }
+        .search-icon {
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            background-color: #707B50;
+            border-radius: 25px;
+            padding: 7px;
+            margin-left: 15px;
+            margin-top: 15px;
+        }
+        #duration {
+            margin-top: -15px;
+            margin-right: 50px;
+            color: #6D492F;   
+        }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #707B50;
+            text-decoration: none;
+            margin-bottom: 5px;
+        }
+        .title:hover {
+            text-decoration: underline;
+        }
+        .summary {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="title">searching shenanigans</h1>
+    <div id="search-container">
+        <input type="text" id="search-box" placeholder="search uci ics" onkeydown="if (event.key === 'Enter') performSearch()">
+        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIyIDIyTDE3LjM1NiAxNy4zNTZNNi4yNSA2LjI1QzguODc4IDMuNjI4IDEzLjEyMiAzLjYyOCAxNS43NSA2LjI1QzE4LjM3MiA4Ljg3OCAxOC4zNzIgMTMuMTIyIDE1Ljc1IDE1Ljc1QzEzLjEyMiAxOC4zNzIgOC44NzggMTguMzcyIDYuMjUgMTUuNzVDMy42MjggMTMuMTIyIDMuNjI4IDguODc4IDYuMjUgNi4yNVoiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==" class="search-icon" onclick="performSearch()">
+    </div>
+    <div id="duration"></div>
+    <div id="results"></div>
+
+    <script>
+        function performSearch() {
+            const query = document.getElementById('search-box').value;
+            fetch(`http://localhost:5000/search?query=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    const resultsDiv = document.getElementById('results');
+                    resultsDiv.innerHTML = '';
+                    data.results.forEach(result => {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'result';
+                        resultDiv.innerHTML = `
+                            <div><a class="title" href="${result.url}" target="_blank">${result.title}</a></div>
+                            <div class="summary">${result.summary}</div>
+                        `;
+                        resultsDiv.appendChild(resultDiv);
+                    });
+
+                    const durationDiv = document.getElementById('duration');
+                    durationDiv.textContent = `Query executed in ${data.duration.toFixed(3)} seconds!`;
+                });
+        }
+    </script>
+</body>
+</html>
