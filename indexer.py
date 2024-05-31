@@ -246,7 +246,7 @@ def indexer(path):
     # inverted index structure
     # {token: [{url: frequency}, {...}], token: ...}
     inverted_index = {}
-    adj_matrix = defaultdict(list)
+    adj_matrix = defaultdict(set)
     
     # Counts to keep track of things
     page_count = 0
@@ -304,7 +304,8 @@ def indexer(path):
                         href = tag.get("href")
                         if href != "#" and href is not None:
                             anchors.append((tag.get_text(),href))
-                    # Page Rank implementation
+                            # Page Rank implementation
+                            adj_matrix[url].add(href)
                     # Writing to index in memory
                     write_inverted_index(url, text, inverted_index, combined_important, anchors)
                     
@@ -325,12 +326,14 @@ def indexer(path):
     dump_count += 1
     write_file(inverted_index, f"inverted_index_{dump_count}.shelve")
     
+    write_file(adj_matrix, "graph.shelve")
+    
     return dump_count, total_page_count
 
 
 if __name__ == "__main__":
     start_time = time.process_time_ns()
-    dump_count, total_page_count = indexer("ANALYST")
+    dump_count, total_page_count = indexer("DEV")
     merge_all_files(dump_count)
     fill_and_split(total_page_count)
     end_time = time.process_time_ns()
