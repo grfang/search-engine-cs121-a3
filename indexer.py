@@ -3,6 +3,7 @@ import os
 import json
 from collections import defaultdict
 from nltk.stem.snowball import SnowballStemmer
+import math
 
 import shelve
 
@@ -40,8 +41,11 @@ def write_inverted_index(url, text, inverted_index):
     frequencies = wordFrequencies(text)
 
     for token, frequency in frequencies.items():
-        # each posting contains url & frequency
-        inverted_index[token].append({url: frequency})
+        if token in inverted_index:
+            inverted_index[token]["df"] += 1
+            inverted_index[token]["postings"].append({"docID": url, "tf": frequency, "tf-idf": None})
+        else:
+            inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": url, "tf": frequency, "tf-idf": None}]}
         
 
 def write_file(inverted_index, file_name):
@@ -51,8 +55,8 @@ def write_file(inverted_index, file_name):
     
     old_data = shelve.open(file_name)
     
-    for token, postings in inverted_index.items():
-        old_data[token] = postings
+    for token, info in inverted_index.items():
+        old_data[token] = info
         old_data.sync()
     
     old_data.close()
@@ -87,7 +91,7 @@ def indexer(path):
     
     # inverted index structure
     # {token: [{url: frequency}, {...}], token: ...}
-    inverted_index = defaultdict(list)
+    inverted_index = {}
     
     # TODO: every 10k files, write, then reset inverted_index
     page_count = 0
@@ -96,7 +100,7 @@ def indexer(path):
     for domain in os.listdir(path):
 
         #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
-        if total_page_count > 1:
+        if total_page_count > 30:
             break
         #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
 
@@ -105,7 +109,7 @@ def indexer(path):
         for page in os.listdir(domain_path):
 
             #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
-            if total_page_count > 1:
+            if total_page_count > 30:
                 break
             #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
 
@@ -128,6 +132,12 @@ def indexer(path):
                 except json.JSONDecodeError as e:
                     print("Error parsing JSON file:", str(e))
 
+    for value in inverted_index.values():
+        value["idf"] = math.log10(total_page_count/value["df"])
+        for posting in value["postings"]:
+            posting["tf-idf"] = value["idf"] * posting["tf"]
+
+    print(inverted_index)
     write_file(inverted_index, f"inverted_index_test.shelve")
 
 

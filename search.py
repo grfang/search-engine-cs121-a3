@@ -3,7 +3,7 @@ from nltk.stem.snowball import SnowballStemmer
 
 if __name__ == "__main__":
     stemmer = SnowballStemmer("english")
-    data = shelve.open("inverted_index.shelve")
+    data = shelve.open("inverted_index_test.shelve")
     while True:
         query = input("What do you want to search?: ")
         query = query.split()
