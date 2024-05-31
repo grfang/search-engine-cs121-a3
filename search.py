@@ -33,7 +33,7 @@ def cosine_sim(query_items, match_list):
 if __name__ == "__main__":
     stemmer = SnowballStemmer("english")
     data = shelve.open("inverted_index_total.shelve")
-    query = "copi code"
+    query = "elimin chen"
     start_time = time.process_time_ns()
     query_lst = query.split()
     for i in range(len(query_lst)):

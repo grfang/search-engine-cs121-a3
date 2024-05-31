@@ -63,24 +63,44 @@ def wordFrequencies(text):
     all_tokens = []
     token = ""
     stemmer = SnowballStemmer("english")
+    positions_dict = defaultdict(list)
+    pos = 0
     for c in text:
         if (('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9') or (c == "'") or (c == "-")):
             token += c
         else:
             if token:   # if token not empty, add token
+                pos += 1
                 all_tokens.append(stemmer.stem(token.lower()))
+                positions_dict[stemmer.stem(token.lower())].append(pos)
                 token = ""
     
     if token:   # add last token
+        pos += 1
         all_tokens.append(stemmer.stem(token.lower()))
+        positions_dict[stemmer.stem(token.lower())].append(pos)
     
     map = defaultdict(int)
     
     # loop through each token and increment its counter in the map
+    buff_str = []
+    buff_str_three = []
     for token in all_tokens:
         map[token] += 1
-    
-    return dict(map)
+        buff_str.append(token)
+        buff_str_three.append(token)
+        if(len(buff_str) == 2):
+            map[" ".join(buff_str)] += 1
+            for num in positions_dict[buff_str[0]]:
+                positions_dict[" ".join(buff_str)].append(num)
+            buff_str.pop(0)
+        if(len(buff_str_three) == 3):
+            map[" ".join(buff_str_three)] += 1
+            for num in positions_dict[buff_str_three[0]]:
+                positions_dict[" ".join(buff_str_three)].append(num)
+            buff_str_three.pop(0)
+
+    return dict(map), dict(positions_dict)
 
 
 def similarity(fingerprint1, fingerprint2):
@@ -92,22 +112,33 @@ def similarity(fingerprint1, fingerprint2):
     return same_bits / 64.0
 
 
-def write_inverted_index(url, text, inverted_index, important_words):
+def write_inverted_index(url, text, inverted_index, important_words, anchors):
     '''
     Write postings to local inverted_index
     '''
-    frequencies = wordFrequencies(text)
-    important_frequencies = wordFrequencies(important_words)
+    frequencies, positions = wordFrequencies(text)
+    important_frequencies, _ = wordFrequencies(important_words)
 
     for token, frequency in frequencies.items():
         add_count = frequency
+        pos_list = positions[token]
         if token in important_frequencies:
             add_count += important_frequencies[token] * 2
         if token in inverted_index:
             inverted_index[token]["df"] += 1
-            inverted_index[token]["postings"].append({"docID": url, "tf": add_count, "tf-idf": None})
+            inverted_index[token]["postings"].append({"docID": url, "tf": add_count, "tf-idf": None, "positions": pos_list})
         else:
-            inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": url, "tf": add_count, "tf-idf": None}]}
+            inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": url, "tf": add_count, "tf-idf": None, "positions": pos_list}]}
+    
+    for anchor_text, anchor_url in anchors:
+        anchor_freqs, anchor_pos = wordFrequencies(anchor_text)
+        for token, frequency in anchor_freqs.items():
+            pos_list = anchor_pos[token]
+            if token in inverted_index:
+                inverted_index[token]["df"] += 1
+                inverted_index[token]["postings"].append({"docID": anchor_url, "tf": frequency, "tf-idf": None, "positions": pos_list})
+            else:
+                inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": anchor_url, "tf": frequency, "tf-idf": None, "positions": pos_list}]}
         
 
 def write_file(inverted_index, file_name):
@@ -215,6 +246,7 @@ def indexer(path):
     # inverted index structure
     # {token: [{url: frequency}, {...}], token: ...}
     inverted_index = {}
+    adj_matrix = defaultdict(list)
     
     # Counts to keep track of things
     page_count = 0
@@ -264,9 +296,17 @@ def indexer(path):
                     # Getting important words
                     important = soup.find_all(['b','strong','h1','h2','h3','title'])
                     combined_important = ' '.join(x.get_text() for x in important)
-                    
+
+                    # Anchor words
+                    anchor_tags = soup.find_all('a')
+                    anchors = []
+                    for tag in anchor_tags:
+                        href = tag.get("href")
+                        if href != "#" and href is not None:
+                            anchors.append((tag.get_text(),href))
+                    # Page Rank implementation
                     # Writing to index in memory
-                    write_inverted_index(url, text, inverted_index, combined_important)
+                    write_inverted_index(url, text, inverted_index, combined_important, anchors)
                     
                     # Incrementing counts
                     page_count += 1
@@ -289,11 +329,10 @@ def indexer(path):
 
 
 if __name__ == "__main__":
-    # start_time = time.process_time_ns()
-    # dump_count, total_page_count = indexer("DEV")
-    # merge_all_files(dump_count)
-    # fill_and_split(total_page_count)
-    # end_time = time.process_time_ns()
-    # with open("time.txt", 'w') as file:
-    #     file.write(f"Indexing time: {end_time - start_time}")
-    pass
+    start_time = time.process_time_ns()
+    dump_count, total_page_count = indexer("ANALYST")
+    merge_all_files(dump_count)
+    fill_and_split(total_page_count)
+    end_time = time.process_time_ns()
+    with open("time.txt", 'w') as file:
+        file.write(f"Indexing time: {end_time - start_time}")
