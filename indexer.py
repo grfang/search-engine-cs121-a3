@@ -34,18 +34,22 @@ def wordFrequencies(text):
     return dict(map)
 
 
-def write_inverted_index(url, text, inverted_index):
+def write_inverted_index(url, text, inverted_index, important_words):
     '''
     Write postings to local inverted_index
     '''
     frequencies = wordFrequencies(text)
+    important_frequencies = wordFrequencies(important_words)
 
     for token, frequency in frequencies.items():
+        add_count = frequency
+        if token in important_frequencies:
+            add_count += important_frequencies[token] * 2
         if token in inverted_index:
             inverted_index[token]["df"] += 1
-            inverted_index[token]["postings"].append({"docID": url, "tf": frequency, "tf-idf": None})
+            inverted_index[token]["postings"].append({"docID": url, "tf": add_count, "tf-idf": None})
         else:
-            inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": url, "tf": frequency, "tf-idf": None}]}
+            inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": url, "tf": add_count, "tf-idf": None}]}
         
 
 def write_file(inverted_index, file_name):
@@ -122,7 +126,9 @@ def indexer(path):
                     content = data["content"]
                     soup = BeautifulSoup(content, 'html.parser')
                     text = soup.get_text()
-                    write_inverted_index(url, text, inverted_index)
+                    important = soup.find_all(['b','strong','h1','h2','h3','title'])
+                    combined_important = ' '.join(x.get_text() for x in important)
+                    write_inverted_index(url, text, inverted_index, combined_important)
                     # page_count += 1
                     total_page_count += 1
                     # if page_count > 10000:
@@ -137,7 +143,7 @@ def indexer(path):
         for posting in value["postings"]:
             posting["tf-idf"] = value["idf"] * posting["tf"]
 
-    print(inverted_index)
+    # print(inverted_index)
     write_file(inverted_index, f"inverted_index_test.shelve")
 
 
