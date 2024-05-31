@@ -4,8 +4,57 @@ import json
 from collections import defaultdict
 from nltk.stem.snowball import SnowballStemmer
 import math
+import hashlib
+import numpy as np
 
 import shelve
+
+def findWeights(text):
+    '''
+    Finds the frequency of each token in a page
+    '''
+    all_tokens = []
+    token = ""
+    for c in text:
+        if (('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9')):
+            token += c
+        else:
+            if token:   # if token not empty, add token
+                all_tokens.append(token.lower())
+                token = ""
+    
+    if token:   # add last token
+        all_tokens.append(token.lower())
+    
+    map = defaultdict(int)
+    # loop through each token and increment its counter in the map
+    for token in all_tokens:
+        map[token] += 1
+    
+    return dict(map)
+
+def generate_fingerprint(weights):
+    '''
+    Generates a fingerprint for simhashing purposes
+    '''
+    # initialize Vector V
+    V = np.zeros(64, dtype=int)
+
+    for word, weight in weights.items():
+        # generate hash value
+        hash_value = hashlib.sha256(word.encode()).digest()[:8]
+        hash = ''.join(f"{byte:08b}" for byte in hash_value)
+
+        # create vector V
+        for i, bit in enumerate(hash):
+            if bit == '1':
+                V[i] += weight
+            else:
+                V[i] -= weight
+
+    # generate fingerprint
+    fingerprint = np.where(V > 0, 1, 0)
+    return fingerprint
 
 def wordFrequencies(text):
     '''
@@ -32,6 +81,15 @@ def wordFrequencies(text):
         map[token] += 1
     
     return dict(map)
+
+
+def similarity(fingerprint1, fingerprint2):
+    '''
+    Compares 2 fingerprints and generate a similarity score
+    '''
+    same_bits = sum(b1 == b2 for b1, b2 in zip(fingerprint1, fingerprint2))
+
+    return same_bits / 64.0
 
 
 def write_inverted_index(url, text, inverted_index, important_words):
@@ -158,10 +216,11 @@ def indexer(path):
     # {token: [{url: frequency}, {...}], token: ...}
     inverted_index = {}
     
-    # TODO: every 10k files, write, then reset inverted_index
+    # Counts to keep track of things
     page_count = 0
     dump_count = 0
     total_page_count = 0
+    fingerprints = []
     # loop through each folder in DEV
     for domain in os.listdir(path):
 
@@ -180,19 +239,40 @@ def indexer(path):
             #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
 
             page_path = os.path.join(domain_path, page)
-            print(page_path)
+            # print(page_path)
             with open(page_path, 'r') as json_file:
                 try:
+                    # Accessing page
                     data = json.load(json_file)
                     url = data["url"]
                     content = data["content"]
                     soup = BeautifulSoup(content, 'html.parser')
                     text = soup.get_text()
+                    
+                    # Checking for similarity
+                    weight = findWeights(text)
+                    fingerprint = generate_fingerprint(weight)
+                    found = 0
+                    for prevFingerprint in fingerprints:
+                        if similarity(fingerprint, prevFingerprint) >= (60.8/64):   # 95% similarity
+                            found = 1
+                            break
+                    if found:
+                        continue
+                    fingerprints.append(fingerprint)
+                    
+                    # Getting important words
                     important = soup.find_all(['b','strong','h1','h2','h3','title'])
                     combined_important = ' '.join(x.get_text() for x in important)
+                    
+                    # Writing to index in memory
                     write_inverted_index(url, text, inverted_index, combined_important)
+                    
+                    # Incrementing counts
                     page_count += 1
                     total_page_count += 1
+                    
+                    # Dump to disk every 10000 pages processed
                     if page_count > 10:#000: TESTING CHANGED TO 10, CHANGE BACK!!!!!!!!!!!!!
                         dump_count += 1
                         write_file(inverted_index, f"inverted_index_{dump_count}.shelve")
