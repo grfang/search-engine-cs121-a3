@@ -8,30 +8,15 @@ import hashlib
 import numpy as np
 import time
 import shelve
+import signal
 
-def findWeights(text):
-    '''
-    Finds the frequency of each token in a page
-    '''
-    all_tokens = []
-    token = ""
-    for c in text:
-        if (('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9')):
-            token += c
-        else:
-            if token:   # if token not empty, add token
-                all_tokens.append(token.lower())
-                token = ""
-    
-    if token:   # add last token
-        all_tokens.append(token.lower())
-    
-    map = defaultdict(int)
-    # loop through each token and increment its counter in the map
-    for token in all_tokens:
-        map[token] += 1
-    
-    return dict(map)
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+signal.signal(signal.SIGALRM, timeout_handler)
 
 def generate_fingerprint(weights):
     '''
@@ -83,22 +68,22 @@ def wordFrequencies(text):
     map = defaultdict(int)
     
     # loop through each token and increment its counter in the map
-    buff_str = []
-    buff_str_three = []
+    # buff_str = []
+    # buff_str_three = []
     for token in all_tokens:
         map[token] += 1
-        buff_str.append(token)
-        buff_str_three.append(token)
-        if(len(buff_str) == 2):
-            map[" ".join(buff_str)] += 1
-            for num in positions_dict[buff_str[0]]:
-                positions_dict[" ".join(buff_str)].append(num)
-            buff_str.pop(0)
-        if(len(buff_str_three) == 3):
-            map[" ".join(buff_str_three)] += 1
-            for num in positions_dict[buff_str_three[0]]:
-                positions_dict[" ".join(buff_str_three)].append(num)
-            buff_str_three.pop(0)
+        # buff_str.append(token)
+        # buff_str_three.append(token)
+        # if(len(buff_str) == 2):
+        #     map[" ".join(buff_str)] += 1
+        #     for num in positions_dict[buff_str[0]]:
+        #         positions_dict[" ".join(buff_str)].append(num)
+        #     buff_str.pop(0)
+        # if(len(buff_str_three) == 3):
+        #     map[" ".join(buff_str_three)] += 1
+        #     for num in positions_dict[buff_str_three[0]]:
+        #         positions_dict[" ".join(buff_str_three)].append(num)
+        #     buff_str_three.pop(0)
 
     return dict(map), dict(positions_dict)
 
@@ -112,11 +97,21 @@ def similarity(fingerprint1, fingerprint2):
     return same_bits / 64.0
 
 
-def write_inverted_index(url, text, inverted_index, important_words, anchors):
+def write_inverted_index(fingerprints, url, text, inverted_index, important_words, anchors):
     '''
     Write postings to local inverted_index
     '''
     frequencies, positions = wordFrequencies(text)
+    
+    fingerprint = generate_fingerprint(frequencies)
+    found = 0
+    for prevFingerprint in fingerprints:
+        if similarity(fingerprint, prevFingerprint) >= (60.8/64):   # 95% similarity
+            found = 1
+            break
+    if found:
+        return fingerprint, 0
+    
     important_frequencies, _ = wordFrequencies(important_words)
 
     for token, frequency in frequencies.items():
@@ -139,12 +134,15 @@ def write_inverted_index(url, text, inverted_index, important_words, anchors):
                 inverted_index[token]["postings"].append({"docID": anchor_url, "tf": frequency, "tf-idf": None, "positions": pos_list})
             else:
                 inverted_index[token] = {"df": 1,"idf": None,"postings": [{"docID": anchor_url, "tf": frequency, "tf-idf": None, "positions": pos_list}]}
+    
+    return fingerprint, 1
         
 
 def write_file(inverted_index, file_name):
     '''
     Write local inverted_index to json file
     '''
+    print(file_name)
     
     old_data = shelve.open(file_name)
     
@@ -246,7 +244,7 @@ def indexer(path):
     # inverted index structure
     # {token: [{url: frequency}, {...}], token: ...}
     inverted_index = {}
-    adj_matrix = defaultdict(set)
+    adj_matrix = defaultdict(list)
     
     # Counts to keep track of things
     page_count = 0
@@ -256,42 +254,31 @@ def indexer(path):
     # loop through each folder in DEV
     for domain in os.listdir(path):
 
-        #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
-        if total_page_count > 30:
-            break
-        #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+        # #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+        # if total_page_count > 100:
+        #     break
+        # #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
 
         domain_path = os.path.join(path, domain)
         # loop through each json & extract content using encoding
         for page in os.listdir(domain_path):
 
-            #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
-            if total_page_count > 30:
-                break
-            #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+            # #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+            # if total_page_count > 100:
+            #     break
+            # #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
 
             page_path = os.path.join(domain_path, page)
-            # print(page_path)
-            with open(page_path, 'r') as json_file:
-                try:
+            print(page_path, page_count)
+            try:
+                signal.alarm(5)
+                with open(page_path, 'r') as json_file:
                     # Accessing page
                     data = json.load(json_file)
                     url = data["url"]
                     content = data["content"]
                     soup = BeautifulSoup(content, 'html.parser')
                     text = soup.get_text()
-                    
-                    # Checking for similarity
-                    weight = findWeights(text)
-                    fingerprint = generate_fingerprint(weight)
-                    found = 0
-                    for prevFingerprint in fingerprints:
-                        if similarity(fingerprint, prevFingerprint) >= (60.8/64):   # 95% similarity
-                            found = 1
-                            break
-                    if found:
-                        continue
-                    fingerprints.append(fingerprint)
                     
                     # Getting important words
                     important = soup.find_all(['b','strong','h1','h2','h3','title'])
@@ -305,22 +292,35 @@ def indexer(path):
                         if href != "#" and href is not None:
                             anchors.append((tag.get_text(),href))
                             # Page Rank implementation
-                            adj_matrix[url].add(href)
+                            adj_matrix[url].append(href)
+                            
                     # Writing to index in memory
-                    write_inverted_index(url, text, inverted_index, combined_important, anchors)
-                    
+                    fingerprint, code = write_inverted_index(fingerprints, url, text, inverted_index, combined_important, anchors)
+                    fingerprints.append(fingerprint)
+                    if len(fingerprints) > 15:
+                        fingerprints.pop(0)
+                    if code:
+                        total_page_count += 1
+                        
                     # Incrementing counts
                     page_count += 1
-                    total_page_count += 1
+
+                    signal.alarm(0)
                     
                     # Dump to disk every 10000 pages processed
-                    if page_count > 10:#000: TESTING CHANGED TO 10, CHANGE BACK!!!!!!!!!!!!!
+                    if page_count > 10000: #TESTING CHANGED TO 10, CHANGE BACK!!!!!!!!!!!!!
                         dump_count += 1
                         write_file(inverted_index, f"inverted_index_{dump_count}.shelve")
                         inverted_index = defaultdict(list)
                         page_count = 0
-                except json.JSONDecodeError as e:
-                    print("Error parsing JSON file:", str(e))
+            except TimeoutException:
+                print(f"Skipping {page_path} due to timeout")
+                signal.alarm(0)
+                continue
+            except json.JSONDecodeError as e:
+                print("Error parsing JSON file:", str(e))
+            finally:
+                signal.alarm(0)
 
     #Final dump
     dump_count += 1
