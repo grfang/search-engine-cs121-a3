@@ -66,27 +66,88 @@ def write_file(inverted_index, file_name):
     old_data.close()
 
 
-def merge_files(f1, f2): 
-    with open(f1, 'r') as f1, open(f2, 'r') as f2:
-        while True:
-            line1 = f1.readline()
-            line2 = f2.readline()
-            if not f1 and not f2:
-                break
+def merge_postings(existing_postings, new_postings):
+        return existing_postings + new_postings
+
+def merge_terms(term1, term2):
+        term1['df'] += term2['df']
+        term1['postings'] = merge_postings(term1['postings'], term2['postings'])
+        term1['idf'] = None  # idf will be set to None as specified
+        return term1
+
+def merge_all_files(dump_count):
+    shelve_files = [f'inverted_index_{i}.shelve' for i in range(1, dump_count + 1)]
+
+    with shelve.open('inverted_index_total.shelve', 'c') as index:
+        for shelve_file in shelve_files:
+            with shelve.open(shelve_file, 'r') as partial:
+                for key in partial:
+                    if key in index:
+                        index[key] = merge_terms(index[key], partial[key])
+                        index.sync()
+                    else:
+                        index[key] = partial[key].copy()
+                        index.sync()
+
+
+def fill_and_split(total_page_count):
+    a_c = shelve.open("a_c_index.shelve")
+    d_f = shelve.open("d_f_index.shelve")
+    g_i = shelve.open("g_i_index.shelve")
+    j_l = shelve.open("j_l_index.shelve")
+    m_o = shelve.open("m_o_index.shelve")
+    p_r = shelve.open("p_r_index.shelve")
+    s_u = shelve.open("s_u_index.shelve")
+    v_z = shelve.open("v_z_index.shelve")
+    misc = shelve.open("misc_index.shelve")
+    
+    #Filling in the appropriate tf-idf values in index
+    with shelve.open("inverted_index_total.shelve") as index:
+        for key, value in index.items():
+            value["idf"] = math.log10(total_page_count/value["df"])
+            for posting in value["postings"]:
+                posting["tf-idf"] = value["idf"] * posting["tf"]
+            index[key] = value
+            index.sync()
             
-            if not f1 and f2:
-                print("F1 finished, we should copy everything in f2 to the new json file")
-            
-            if not f2 and f1:
-                print("F1 finished, we should copy everything in f2 to the new json file")
-            
+            if 'a' <= key[0] <= 'c':
+                a_c[key] = value
+                a_c.sync()
+            elif 'd' <= key[0] <= 'f':
+                d_f[key] = value
+                d_f.sync()
+            elif 'g' <= key[0] <= 'i':
+                g_i[key] = value
+                g_i.sync()
+            elif 'j' <= key[0] <= 'l':
+                j_l[key] = value
+                j_l.sync()
+            elif 'm' <= key[0] <= 'o':
+                m_o[key] = value
+                m_o.sync()
+            elif 'p' <= key[0] <= 'r':
+                p_r[key] = value
+                p_r.sync()
+            elif 's' <= key[0] <= 'u':
+                s_u[key] = value
+                s_u.sync()
+            elif 'v' <= key[0] <= 'z':
+                v_z[key] = value
+                v_z.sync()
             else:
-                #Compare line1 and line2. 
-                #If they are similar, then we merge them and put them into a json file
-                #else, we write which ever higher in alphabetical order to the json file then move to the next line
-                continue
-                
- 
+                misc[key] = value
+                misc.sync()
+    
+    a_c.close()
+    d_f.close()
+    g_i.close()
+    j_l.close()
+    m_o.close()
+    p_r.close()
+    s_u.close()
+    v_z.close()
+    misc.close()
+
         
 def indexer(path):
     if not os.path.exists(path):
@@ -99,6 +160,7 @@ def indexer(path):
     
     # TODO: every 10k files, write, then reset inverted_index
     page_count = 0
+    dump_count = 0
     total_page_count = 0
     # loop through each folder in DEV
     for domain in os.listdir(path):
@@ -129,26 +191,24 @@ def indexer(path):
                     important = soup.find_all(['b','strong','h1','h2','h3','title'])
                     combined_important = ' '.join(x.get_text() for x in important)
                     write_inverted_index(url, text, inverted_index, combined_important)
-                    # page_count += 1
+                    page_count += 1
                     total_page_count += 1
-                    # if page_count > 10000:
-                    #     write_file(inverted_index, f"inverted_index_{total_page_count}.json")
-                    #     inverted_index = defaultdict(list)
-                    #     page_count = 0
+                    if page_count > 10:#000: TESTING CHANGED TO 10, CHANGE BACK!!!!!!!!!!!!!
+                        dump_count += 1
+                        write_file(inverted_index, f"inverted_index_{dump_count}.shelve")
+                        inverted_index = defaultdict(list)
+                        page_count = 0
                 except json.JSONDecodeError as e:
                     print("Error parsing JSON file:", str(e))
 
-    for value in inverted_index.values():
-        value["idf"] = math.log10(total_page_count/value["df"])
-        for posting in value["postings"]:
-            posting["tf-idf"] = value["idf"] * posting["tf"]
-
-    # print(inverted_index)
-    write_file(inverted_index, f"inverted_index_test.shelve")
+    #Final dump
+    dump_count += 1
+    write_file(inverted_index, f"inverted_index_{dump_count}.shelve")
+    
+    return dump_count, total_page_count
 
 
 if __name__ == "__main__":
-    indexer("DEV")
-
-    # #TODO: merge every pair of files
-    #merge_files()
+    dump_count, total_page_count = indexer("DEV")
+    merge_all_files(dump_count)
+    fill_and_split(total_page_count)
