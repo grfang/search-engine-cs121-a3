@@ -6,7 +6,7 @@ from nltk.stem.snowball import SnowballStemmer
 import math
 import hashlib
 import numpy as np
-
+import time
 import shelve
 
 def findWeights(text):
@@ -289,6 +289,11 @@ def indexer(path):
 
 
 if __name__ == "__main__":
-    dump_count, total_page_count = indexer("DEV")
-    merge_all_files(dump_count)
-    fill_and_split(total_page_count)
+    # start_time = time.process_time_ns()
+    # dump_count, total_page_count = indexer("DEV")
+    # merge_all_files(dump_count)
+    # fill_and_split(total_page_count)
+    # end_time = time.process_time_ns()
+    # with open("time.txt", 'w') as file:
+    #     file.write(f"Indexing time: {end_time - start_time}")
+    pass

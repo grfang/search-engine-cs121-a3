@@ -29,6 +29,7 @@ def cosine_sim(query, match_list):
     best_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:5]
     return best_scores
 
+
 if __name__ == "__main__":
     stemmer = SnowballStemmer("english")
     data = shelve.open("inverted_index_test.shelve")
