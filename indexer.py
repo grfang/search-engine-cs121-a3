@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import os
 import json
 from collections import defaultdict
+from nltk.stem.snowball import SnowballStemmer
 
 import shelve
 
@@ -11,16 +12,17 @@ def wordFrequencies(text):
     '''
     all_tokens = []
     token = ""
+    stemmer = SnowballStemmer("english")
     for c in text:
         if (('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9') or (c == "'") or (c == "-")):
             token += c
         else:
             if token:   # if token not empty, add token
-                all_tokens.append(token.lower())
+                all_tokens.append(stemmer.stem(token.lower()))
                 token = ""
     
     if token:   # add last token
-        all_tokens.append(token.lower())
+        all_tokens.append(stemmer.stem(token.lower()))
     
     map = defaultdict(int)
     
@@ -46,30 +48,14 @@ def write_file(inverted_index, file_name):
     '''
     Write local inverted_index to json file
     '''
-    # try:
-    #     with open(file_name, "r") as file:
-    #         old_data = json.load(file)
-    # except: 
-    #     old_data = defaultdict(list)
     
     old_data = shelve.open(file_name)
     
     for token, postings in inverted_index.items():
         old_data[token] = postings
         old_data.sync()
-        # for posting in postings:
-        #     for url, frequency in posting.items():
-        #         if token in old_data:
-        #             old_data[token].append({url: frequency})
-        #             old_data.sync()
-        #         else:
-        #             old_data[token] = [{url: frequency}]
-        #             old_data.sync()
     
     old_data.close()
-
-    # with open(file_name, "w") as file:
-    #     json.dump(old_data, file, indent=4)
 
 
 def merge_files(f1, f2): 
@@ -108,11 +94,21 @@ def indexer(path):
     total_page_count = 0
     # loop through each folder in DEV
     for domain in os.listdir(path):
-        if domain != "www_informatics_uci_edu":
-            continue
+
+        #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+        if total_page_count > 1:
+            break
+        #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+
         domain_path = os.path.join(path, domain)
         # loop through each json & extract content using encoding
         for page in os.listdir(domain_path):
+
+            #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+            if total_page_count > 1:
+                break
+            #LIMITING ROUNDS FOR TESTING, DELETE!!!!!!!!!!!
+
             page_path = os.path.join(domain_path, page)
             print(page_path)
             with open(page_path, 'r') as json_file:
@@ -132,9 +128,7 @@ def indexer(path):
                 except json.JSONDecodeError as e:
                     print("Error parsing JSON file:", str(e))
 
-    write_file(inverted_index, f"inverted_index_{total_page_count}.shelve")
-    print(f"The number of indexed documents: {total_page_count}")
-    print(f"The number of unique words: {len(inverted_index)}")
+    write_file(inverted_index, f"inverted_index_test.shelve")
 
 
 if __name__ == "__main__":

@@ -1,13 +1,15 @@
 import shelve
+from nltk.stem.snowball import SnowballStemmer
 
 if __name__ == "__main__":
+    stemmer = SnowballStemmer("english")
     data = shelve.open("inverted_index.shelve")
     while True:
         query = input("What do you want to search?: ")
         query = query.split()
         docs = list()
         for token in query:
-            docs.append(sorted(data[token], key=lambda x: list(x.keys())[0]))
+            docs.append(sorted(data[stemmer.stem(token.lower())], key=lambda x: list(x.keys())[0]))
         sorted_lists = sorted(docs, key=lambda x: len(x))
 
         if len(sorted_lists) > 1:

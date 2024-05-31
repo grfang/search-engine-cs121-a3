@@ -1,6 +1,4 @@
 DEV
 developer.zip
-inverted_index_55393.shelve
-inverted_index_1454.shelve
-inverted_index.shelve
-inverted_index_55393.json
+*.shelve
+*.json
