@@ -287,19 +287,63 @@ def cosine_sim(query_items, match_list):
                     w_tq = idf
                     # find the url's hit score in hit_list and add
                     pr_score = 0
-                    if docid in pr_list:
-                        pr_score = pr_list[docid]
+                    if docid in normalized_pr_list:
+                        pr_score = normalized_pr_list[docid]
                     # find the url's page rank score and add
-                    scores[docid] += (1 - pr_weight) * (w_td * w_tq) + pr_weight * pr_score  #alter this line to consider pagerank, hub and authority scores maybe have to normalize
+                    scores[docid] += (1 - pr_weight) * (w_td * w_tq) + pr_weight * pr_score
                     doc_length[docid] += (w_td * w_tq) ** 2 #(tf_idf ** 2) ** 0.5
 
     for d in scores:
         if doc_length[d] > 0:
             scores[d] /= doc_length[d]
 
-    best_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    best_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:10]
     return best_scores
 
+
+def temp(query):
+    stemmer = SnowballStemmer("english")
+
+    # parse query
+    start_time = time.time_ns()
+    query_lst = query.split()
+    for i in range(len(query_lst)):
+        query_lst[i] = stemmer.stem(query_lst[i].lower())
+
+    # parse docs
+    docs = dict()
+    for q in query_lst:
+        if 'a' <= q[0] <= 'c':
+            docs[q] = a_c[q].copy()
+        elif 'd' <= q[0] <= 'f':
+            docs[q] = d_f[q].copy()
+        elif 'g' <= q[0] <= 'i':
+            docs[q] = g_i[q].copy()
+        elif 'j' <= q[0] <= 'l':
+            docs[q] = j_l[q].copy()
+        elif 'm' <= q[0] <= 'o':
+            docs[q] = m_o[q].copy()
+        elif 'p' <= q[0] <= 'r':
+            docs[q] = p_r[q].copy()
+        elif 's' <= q[0] <= 'u':
+            docs[q] = s_u[q].copy()
+        elif 'v' <= q[0] <= 'z':
+            docs[q] = v_z[q].copy()
+        else:
+            docs[q] = misc[q]
+
+    results = cosine_sim(query_lst, docs)
+    end_time = time.time_ns()
+    duration = (end_time - start_time) / 1000000
+
+    final = set()
+
+    for url, score in results:
+        final.add(url)
+
+    print(results)
+    print(f"{query} duration: {duration}")
+    print(f"{query} num docs: {len(final)}")
 
 if __name__ == "__main__":
     app.run()
