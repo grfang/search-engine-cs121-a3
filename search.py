@@ -50,7 +50,7 @@ print("Opened misc")
 with shelve.open('graph.shelve') as shelve_file:
     adj_list = dict(shelve_file)
 print("Opened adj_list")
-with shelve.open('pageRank.shelve') as pageranks:
+with shelve.open('pageRanks.shelve') as pageranks:
     pr_list = dict(pageranks)
 print("Opened pr_list")
 

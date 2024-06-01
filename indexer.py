@@ -431,8 +431,4 @@ if __name__ == "__main__":
     #     file.write(f"Indexing time: {end_time - start_time}")
     # pageRanks = pagerank()
     # write_file(pageRanks, "pageRanks.shelve")
-    count = 0
-    with shelve.open('pageRanks.shelve') as db:
-        for key in db:
-            count += 1
-        print(count)
+    pass
