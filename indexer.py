@@ -330,12 +330,60 @@ def indexer(path):
     
     return dump_count, total_page_count
 
+def pagerank(d=0.85, max_iterations=1, tolerance=0.001):
+    with shelve.open('graph.shelve') as shelve_file:
+        adj_list = dict(shelve_file)
+    
+    pages = list(adj_list.keys())
+    N = len(pages)
+    page_index = {page: i for i, page in enumerate(pages)}
+    
+    # Initialize PageRank values
+    pageRank = np.ones(N) / N
+    newRank = np.zeros(N)
+    
+    # Precompute outbound link counts
+    outbound_counts = {page: len(links) for page, links in adj_list.items()}
+    
+    # Handle dangling nodes
+    dangling_nodes = [page for page in pages if outbound_counts[page] == 0]
+    
+    for iteration in range(max_iterations):
+        print(f"iteration: {iteration}")
+        
+        dangling_sum = sum(pageRank[page_index[page]] for page in dangling_nodes)
+        
+        for i, page in enumerate(pages):
+            sum_rank = sum(pageRank[page_index[linking_page]] / outbound_counts[linking_page]
+                           for linking_page in adj_list if page in adj_list[linking_page])
+            newRank[i] = (1 - d) / N + d * (sum_rank + dangling_sum / N)
+        
+        # Check for convergence
+        if np.linalg.norm(newRank - pageRank, 1) < tolerance:
+            print(f"Converged after {iteration + 1} iterations")
+            break
+        
+        pageRank, newRank = newRank, pageRank
+    
+    adj_list.clear()
+    
+    # Map back to the original page identifiers
+    pageRank_dict = {page: pageRank[i] for page, i in page_index.items()}
+    
+    return pageRank_dict
 
 if __name__ == "__main__":
-    start_time = time.process_time_ns()
-    dump_count, total_page_count = indexer("DEV")
-    merge_all_files(dump_count)
-    fill_and_split(total_page_count)
-    end_time = time.process_time_ns()
-    with open("time.txt", 'w') as file:
-        file.write(f"Indexing time: {end_time - start_time}")
+    # start_time = time.process_time_ns()
+    # dump_count, total_page_count = indexer("DEV")
+    # merge_all_files(dump_count)
+    # fill_and_split(total_page_count)
+    # end_time = time.process_time_ns()
+    # with open("time.txt", 'w') as file:
+    #     file.write(f"Indexing time: {end_time - start_time}")
+    temp = pagerank()
+    count = 0
+    for key, value in temp.items():
+        count += 1
+        print(key, value)
+        if count > 10:
+            break
