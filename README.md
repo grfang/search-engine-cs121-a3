@@ -11,5 +11,5 @@ This project creates an inverted index from a collection of documents and perfor
 2. Run the indexing script to create the inverted index:
 ```python3 indexer.py```
 3. Run the GUI:
-```python3 search.py```
+```python search.py```
 4. Enter your query into the search box and view results.
