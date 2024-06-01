@@ -10,6 +10,7 @@ from openai import OpenAI
 import time
 import os
 from dotenv import load_dotenv
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -18,7 +19,60 @@ load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=api_key)
 
+with shelve.open("a_c_index.shelve") as a_c_dict:
+    a_c = dict(a_c_dict)
+print("Opened a_c")
+with shelve.open("d_f_index.shelve") as d_f_dict:
+    d_f = dict(d_f_dict)
+print("Opened d_f")
+with shelve.open("g_i_index.shelve") as g_i_dict:
+    g_i = dict(g_i_dict)
+print("Opened g_i")
+with shelve.open("j_l_index.shelve") as j_l_dict:
+    j_l = dict(j_l_dict)
+print("Opened j_l")
+with shelve.open("m_o_index.shelve") as m_o_dict:
+    m_o = dict(m_o_dict)
+print("Opened m_o")
+with shelve.open("p_r_index.shelve")as p_r_dict:
+    p_r = dict(p_r_dict)
+print("Opened p_r")
+with shelve.open("s_u_index.shelve") as s_u_dict:
+    s_u = dict(s_u_dict)
+print("Opened s_u")
+with shelve.open("v_z_index.shelve") as v_z_dict:
+    v_z = dict(v_z_dict)
+print("Opened v_z")
+with shelve.open("misc_index.shelve") as misc_dict:
+    misc = dict(misc_dict)
+print("Opened misc")
+
+with shelve.open('graph.shelve') as shelve_file:
+    adj_list = dict(shelve_file)
+print("Opened adj_list")
+with shelve.open('pageRank.shelve') as pageranks:
+    pr_list = dict(pageranks)
+print("Opened pr_list")
+
+def preprocess_adj_list(adj_list):
+    """
+    Convert outbound to inbound list.
+    """
+    inbound_links = defaultdict(list)
+    for page, outbound_links in adj_list.items():
+        for link in outbound_links:
+            inbound_links[link].append(page)
+    return inbound_links
+
+inbound_links = preprocess_adj_list(adj_list)
+print("Inbound links created")
+
 def summarize(url):
+    """
+    Parse url for title and text content.
+    Summarize with gpt-3.5 model.
+    Return title and summary.
+    """
     try:
         # get page content
         response = requests.get(url, verify=False)
@@ -44,18 +98,26 @@ def summarize(url):
 
         return title, summary
     except:
-        return url, "No summary could be generated."
+        return None
 
 
 @app.route('/')
 def index():
+    """
+    Install html file.
+    """
     return send_from_directory('.', 'index.html')
 
 
 @app.route('/search')
 def search():
+    """
+    Receive query items and documents.
+    Search and time the query.
+    Send summaries to frontend.
+    """
     stemmer = SnowballStemmer("english")
-    data = shelve.open("inverted_index_total.shelve")
+    # data = shelve.open("inverted_index_total.shelve")
 
     # parse query
     query = request.args.get('query')
@@ -67,17 +129,36 @@ def search():
     # parse docs
     docs = dict()
     for q in query_lst:
-        docs[q] = data[q].copy()
+        # docs[q] = data[q].copy()
+        if 'a' <= q[0] <= 'c':
+            docs[q] = a_c[q].copy()
+        elif 'd' <= q[0] <= 'f':
+            docs[q] = d_f[q].copy()
+        elif 'g' <= q[0] <= 'i':
+            docs[q] = g_i[q].copy()
+        elif 'j' <= q[0] <= 'l':
+            docs[q] = j_l[q].copy()
+        elif 'm' <= q[0] <= 'o':
+            docs[q] = m_o[q].copy()
+        elif 'p' <= q[0] <= 'r':
+            docs[q] = p_r[q].copy()
+        elif 's' <= q[0] <= 'u':
+            docs[q] = s_u[q].copy()
+        elif 'v' <= q[0] <= 'z':
+            docs[q] = v_z[q].copy()
+        else:
+            docs[q] = misc[q]
 
     results = cosine_sim(query_lst, docs)
     end_time = time.time_ns()
     duration = (end_time - start_time) / 1000000
-    data.close()
+    # data.close()
 
     summaries = []
     for result in results:
-        title, summary = summarize(result[0])
-        summaries.append({"title": title, "summary": summary, "url": result[0]})
+        if summarize(result[0]) != None:
+            title, summary = summarize(result[0])
+            summaries.append({"title": title, "summary": summary, "url": result[0]})
 
     return jsonify(results=summaries, duration=duration)
 
@@ -119,16 +200,66 @@ def positions_check(query_items, match_list, max_distance=5):
 
     return valid_docs
 
-def hits(query_items, match_list):
-    return None
-    # read the urls within the match_list, find url that connect to these 
+
+def expand_root_set(root_set, adj_list, inbound_links):
+    base_set = set(root_set)
+    for page in root_set:
+        base_set.update(inbound_links[page])  # Include pages that link to pages in root set
+        for linked_page in inbound_links[page]:
+            base_set.update(adj_list[linked_page])  # Include pages that are linked to by pages in root set
+    return list(base_set)
+
+def normalize_scores(scores):
+    norm_factor = np.sqrt(sum(score ** 2 for score in scores.values()))
+    for page in scores:
+        scores[page] /= norm_factor
+
+def not_converged(old_hub_scores, hub_scores, old_auth_scores, auth_scores, tolerance):
+    hub_changes = sum(abs(old_hub_scores[page] - hub_scores[page]) for page in hub_scores)
+    auth_changes = sum(abs(old_auth_scores[page] - auth_scores[page]) for page in auth_scores)
+    return hub_changes > tolerance or auth_changes > tolerance
+
+def hits(relevant_docs, max_iterations=100, tolerance=0.0001):
+    print("IN HITS")
+    base_set = expand_root_set(relevant_docs, adj_list, inbound_links)
+    hub_scores = {page: 1 for page in base_set}
+    auth_scores = {page: 1 for page in base_set}
+    
+    for iteration in range(max_iterations):
+        print(f"Iteration: {iteration}")
+        old_hub_scores = hub_scores.copy()
+        old_auth_scores = auth_scores.copy()
+        
+        # Authority update
+        for page in base_set:
+            auth_scores[page] = sum(hub_scores[q] for q in inbound_links[page] if q in hub_scores)
+        
+        # Hub update
+        for page in base_set:
+            hub_scores[page] = sum(auth_scores[q] for q in adj_list[page] if q in auth_scores)
+        
+        # Normalization
+        normalize_scores(hub_scores)
+        normalize_scores(auth_scores)
+        
+        # Check for convergence
+        if not not_converged(old_hub_scores, hub_scores, old_auth_scores, auth_scores, tolerance):
+            print("CONVERGED")
+            break
+    
+    return hub_scores, auth_scores
+
 
 def cosine_sim(query_items, match_list):
+    """
+    Return search results based on tf-idf score.
+    """
     scores = defaultdict(float)
     doc_length = defaultdict(float)
 
     valid_docs = positions_check(query_items, match_list)
-
+    hub_scores, auth_scores = hits(valid_docs)
+    #page_rank_result
     for term in query_items:
         if term in match_list:
             key_word = match_list[term]
@@ -143,14 +274,20 @@ def cosine_sim(query_items, match_list):
                     else:
                         w_td = 0
                     w_tq = idf
-                    scores[docid] += w_td * w_tq
+                    # find the url's hit score in hit_list and add
+                    hit_score = hub_scores[docid] + auth_scores[docid]
+                    pr_score = pr_list[docid]
+                    if pr_score < 1:
+                        pr_score = 1
+                    # find the url's page rank score and add
+                    scores[docid] += w_td * w_tq * hit_score * pr_score  #alter this line to consider pagerank, hub and authority scores maybe have to normalize
                     doc_length[docid] += (tf_idf ** 2) ** 0.5
 
     for d in scores:
         if doc_length[d] > 0:
             scores[d] /= doc_length[d]
     
-    best_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:5]
+    best_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     return best_scores
 
 

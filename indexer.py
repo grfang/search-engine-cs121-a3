@@ -16,11 +16,12 @@ class TimeoutException(Exception):
 def timeout_handler(signum, frame):
     raise TimeoutException
 
+# Install timeout_handler to skip links with lengthy loads
 signal.signal(signal.SIGALRM, timeout_handler)
 
 def generate_fingerprint(weights):
     '''
-    Generates a fingerprint for simhashing purposes
+    Generates a fingerprint for simhashing purposes.
     '''
     # initialize Vector V
     V = np.zeros(64, dtype=int)
@@ -43,7 +44,7 @@ def generate_fingerprint(weights):
 
 def wordFrequencies(text):
     '''
-    Finds all the frequencies of words, accounts for ' and -
+    Finds all the frequencies of words, accounts for ' and -.
     '''
     all_tokens = []
     token = ""
@@ -67,6 +68,7 @@ def wordFrequencies(text):
     
     map = defaultdict(int)
     
+    ### ATTEMPTED 2-gram and 3-gram indexing
     # loop through each token and increment its counter in the map
     # buff_str = []
     # buff_str_three = []
@@ -90,7 +92,7 @@ def wordFrequencies(text):
 
 def similarity(fingerprint1, fingerprint2):
     '''
-    Compares 2 fingerprints and generate a similarity score
+    Compares 2 fingerprints and generate a similarity score.
     '''
     same_bits = sum(b1 == b2 for b1, b2 in zip(fingerprint1, fingerprint2))
 
@@ -99,7 +101,8 @@ def similarity(fingerprint1, fingerprint2):
 
 def write_inverted_index(fingerprints, url, text, inverted_index, important_words, anchors):
     '''
-    Write postings to local inverted_index
+    Write postings to local inverted_index.
+    Posting contains these features: docID, tf, tf-idf, positions.
     '''
     frequencies, positions = wordFrequencies(text)
     
@@ -140,7 +143,7 @@ def write_inverted_index(fingerprints, url, text, inverted_index, important_word
 
 def write_file(inverted_index, file_name):
     '''
-    Write local inverted_index to json file
+    Write local inverted_index to json file.
     '''
     print(file_name)
     
@@ -154,15 +157,26 @@ def write_file(inverted_index, file_name):
 
 
 def merge_postings(existing_postings, new_postings):
-        return existing_postings + new_postings
+    """
+    Merge new postings into current postings.
+    """
+    return existing_postings + new_postings
+
 
 def merge_terms(term1, term2):
-        term1['df'] += term2['df']
-        term1['postings'] = merge_postings(term1['postings'], term2['postings'])
-        term1['idf'] = None  # idf will be set to None as specified
-        return term1
+    """
+    Merge frequency and postings of two terms.
+    """
+    term1['df'] += term2['df']
+    term1['postings'] = merge_postings(term1['postings'], term2['postings'])
+    term1['idf'] = None  # idf will be set to None as specified
+    return term1
+
 
 def merge_all_files(dump_count):
+    """
+    Merge multiple shelve files into single shelve file.
+    """
     shelve_files = [f'inverted_index_{i}.shelve' for i in range(1, dump_count + 1)]
 
     with shelve.open('inverted_index_total.shelve', 'c') as index:
@@ -178,6 +192,9 @@ def merge_all_files(dump_count):
 
 
 def fill_and_split(total_page_count):
+    """
+    Create tf-idf value for each posting.
+    """
     a_c = shelve.open("a_c_index.shelve")
     d_f = shelve.open("d_f_index.shelve")
     g_i = shelve.open("g_i_index.shelve")
@@ -237,6 +254,11 @@ def fill_and_split(total_page_count):
 
         
 def indexer(path):
+    """
+    Build inverted index.
+    Dump to disk routinely.
+    Implements anchor words, PageRank algorithm, and HITS algorithm.
+    """
     if not os.path.exists(path):
         print("Directory not found")
         return
@@ -330,47 +352,74 @@ def indexer(path):
     
     return dump_count, total_page_count
 
-def pagerank(d=0.85, max_iterations=1, tolerance=0.001):
+
+def preprocess_adj_list(adj_list):
+    """
+    Convert outbound to inbound list.
+    """
+    inbound_links = defaultdict(list)
+    for page, outbound_links in adj_list.items():
+        for link in outbound_links:
+            inbound_links[link].append(page)
+    return inbound_links
+
+
+def hits(query):
+    """
+    Implement HITS algorithm.
+    """
+    with shelve.open('graph.shelve') as shelve_file:
+        adj_list = dict(shelve_file)
+    inbound_links = preprocess_adj_list(adj_list)
+    result_dict = dict()
+    # based on the query
+    relevant_url_list = set()
+    for q in query:
+        if q in adj_list:
+            for item in adj_list[q]:
+                relevant_url_list.add(item)
+        if q in inbound_links:
+            for item in inbound_links[q]:
+                relevant_url_list.add(item)
+    # have a list of relevant url in relevant_url_list
+    # find all the url in shelve, if url in relevant, then we add the url to the dict and have value as tuple (hub, auth)
+    #for relevant_url in relevant_url_list:
+    return None
+    # read the urls within the match_list, find url that connect to these and place them into the match_list
+    # rank based on 
+
+
+def pagerank(d=0.85, max_iterations=100, tolerance=1.0e-6):
+
+    """
+    Implement PageRank algorithm.
+    """
     with shelve.open('graph.shelve') as shelve_file:
         adj_list = dict(shelve_file)
     
+    inbound_links = preprocess_adj_list(adj_list)
     pages = list(adj_list.keys())
     N = len(pages)
-    page_index = {page: i for i, page in enumerate(pages)}
-    
-    # Initialize PageRank values
-    pageRank = np.ones(N) / N
-    newRank = np.zeros(N)
-    
-    # Precompute outbound link counts
-    outbound_counts = {page: len(links) for page, links in adj_list.items()}
-    
-    # Handle dangling nodes
-    dangling_nodes = [page for page in pages if outbound_counts[page] == 0]
+    pageRank = {page: 1.0 / N for page in pages}
+    newRank = pageRank.copy()
     
     for iteration in range(max_iterations):
-        print(f"iteration: {iteration}")
-        
-        dangling_sum = sum(pageRank[page_index[page]] for page in dangling_nodes)
-        
-        for i, page in enumerate(pages):
-            sum_rank = sum(pageRank[page_index[linking_page]] / outbound_counts[linking_page]
-                           for linking_page in adj_list if page in adj_list[linking_page])
-            newRank[i] = (1 - d) / N + d * (sum_rank + dangling_sum / N)
+        print(f"Iteration: {iteration}")
+        for page in pages:
+            sum_rank = 0
+            for linking_page in inbound_links[page]:
+                sum_rank += pageRank[linking_page] / len(adj_list[linking_page])
+            newRank[page] = (1 - d) / N + d * sum_rank
         
         # Check for convergence
-        if np.linalg.norm(newRank - pageRank, 1) < tolerance:
+        if all(abs(newRank[page] - pageRank[page]) < tolerance for page in pages):
             print(f"Converged after {iteration + 1} iterations")
             break
         
-        pageRank, newRank = newRank, pageRank
+        # Update pageRank values
+        pageRank.update(newRank)
     
-    adj_list.clear()
-    
-    # Map back to the original page identifiers
-    pageRank_dict = {page: pageRank[i] for page, i in page_index.items()}
-    
-    return pageRank_dict
+    return pageRank
 
 if __name__ == "__main__":
     # start_time = time.process_time_ns()
@@ -380,10 +429,10 @@ if __name__ == "__main__":
     # end_time = time.process_time_ns()
     # with open("time.txt", 'w') as file:
     #     file.write(f"Indexing time: {end_time - start_time}")
-    temp = pagerank()
+    # pageRanks = pagerank()
+    # write_file(pageRanks, "pageRanks.shelve")
     count = 0
-    for key, value in temp.items():
-        count += 1
-        print(key, value)
-        if count > 10:
-            break
+    with shelve.open('pageRanks.shelve') as db:
+        for key in db:
+            count += 1
+        print(count)

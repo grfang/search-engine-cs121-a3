@@ -11,8 +11,9 @@ if __name__ == "__main__":
     # v_z_index.shelve
     # misc_index.shelve
     count = 0
-    with shelve.open('graph.shelve') as db:
+    with shelve.open('misc_index.shelve') as db:
         for key in db:
             count += 1
+            print(key, db[key])
         print(count)
     db.close()
