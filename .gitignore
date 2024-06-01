@@ -3,5 +3,5 @@ DEV
 *.shelve
 *.json
 ANALYST
-*.txt
+time.txt
 .env

@@ -1,0 +1,76 @@
+Query: shindler
+Poor Effectiveness: Received a requests.exceptions.HTTPError: 404 Client Error. Program was not properly handling pages with 404 error.
+Solution: Caught the exception and returned the url instead of a title and summary.
+
+Query: wics
+Poor Effectiveness: Received a requests.exceptions.RequestException.
+Solution: Caught the exception and returned the url instead of a title and summary.
+
+Query: wongma
+Poor Effectiveness: Received a requests.exceptions.MissingSchema: Invalid URL. Program was not properly handling pages with incorrect url syntax.
+Solution: Caught the exception and returned the url instead of a title and summary.
+
+Query: machine learning
+Poor Effectiveness: Resulting links were very irrelevant and had low page information.
+Solution: Implemented word positions to prioritize query item order. Increased recall because of more relevant search results.
+
+Query: ACM
+Poor Efficiency: This query took about 220 ms to complete.
+Solution: Instead of opening each shelve file upon every query, we open it initally on the GUI load. The data is saved globally and query times speed up to ~70 ms.08b
+
+Query: elimin chen
+Poor Effectiveness: received some pages that are not as relevant as other.
+Solution: Implemented page rank, and removed the code that checks docID
+
+Query: I want a cheeseburger
+Poor Effectiveness: A lot of the links are associated with I and want, but not cheeseburger
+Solution: Used multiplication instead of addition in weight calculation to boost relevancy
+
+Query: compsci alberto
+Poor Effectiveness: When we first ran this query, a lot of the urls are 404 not found
+Solution: Set up a filter to check for links that doesn't work
+
+Query: what's nine plus ten
+Poor Effectiveness: A lot of the pages we got is very similar
+Solution: Set up a filter to check similarity. Also counts as extra credit
+
+Query: machine learning does not learn, but machine is learning
+Poor Efficiency: the GUI wasn't running
+Solution: we used python3 instead of python, and removed debug 
+
+Query: 麻了，累了，チェ・チー・ドゥオリン，hasta mañana
+Poor Effectiveness: this is written in another language, we shouldn't even look for it
+Solution: stemmer in english, ignore these
+
+Query: @***909***@, !@!>_<!@! :33333 Krone
+Poor Effectiveness: this is not in english as well, so we should ignore
+Solution: filter these
+
+Query: - 
+Poor Effectiveness: this should work because it is allowed, but the result contains very similar pages
+Solution: implement check similarity functions to remove junk webpages
+
+Query: to be or not to be
+Poor Efficiency: Took very long
+Solution: Removed some links that take a long time to open 
+
+Query: research
+This did pretty good, since there's only one word in the query.
+
+Query: computer graphic
+This did good
+
+Query: network security
+This did good
+
+Query: solution for 53 hw5
+Poor Efficiency: takes too long, the query is kinda long so we have to optimize the query
+Solution: ignore words like "for" to improve the speed
+
+Query: investigate the effectiveness investigate the effectiveness investigate the effectiveness investigate the effectiveness investigate the effectiveness investigate the effectiveness investigate the effectiveness investigate the effectiveness
+Poor Efficiency: takes too long, the query is long and its not useful
+Solution: optimize the query to make it shorter, thus more efficient
+
+Query: 7%9=7*7=49-40=9(3)=27-1
+Poor Efficiency:
+Solution: took too long, and the GUI was not running, fixed by running it without debug
