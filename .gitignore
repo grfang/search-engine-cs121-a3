@@ -4,4 +4,5 @@ DEV
 *.json
 ANALYST
 time.txt
+valid_docs.txt
 .env
