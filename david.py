@@ -11,9 +11,11 @@ if __name__ == "__main__":
     # v_z_index.shelve
     # misc_index.shelve
     count = 0
-    with shelve.open('misc_index.shelve') as db:
+    with shelve.open('pageRanks.shelve') as db:
         for key in db:
             count += 1
-            print(key, db[key])
+            print(db[key])
+            if count>10:
+                break
         print(count)
     db.close()
